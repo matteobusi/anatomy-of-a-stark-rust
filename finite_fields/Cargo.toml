@@ -1,0 +1,8 @@
+[package]
+name = "finite_fields"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crypto-bigint = { path = "../crypto-bigint" }
+extended_gcd = { path = "../extended_gcd" }

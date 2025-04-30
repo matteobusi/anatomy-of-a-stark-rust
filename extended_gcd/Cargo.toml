@@ -1,0 +1,7 @@
+[package]
+name = "extended_gcd"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crypto-bigint = { path = "../crypto-bigint" }
