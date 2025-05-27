@@ -241,7 +241,7 @@ impl MPolynomial {
         let mut value = Polynomial::ZERO;
 
         for (k, v) in &self.monomial_map {
-            let mut prod = Polynomial::new(&vec![*v; 1]);
+            let mut prod = Polynomial::new(&[*v; 1]);
             for i in 0..k.len() {
                 prod = prod * (point[i].clone() ^ k[i]);
             }

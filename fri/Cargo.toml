@@ -4,4 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+blake2 = "0.10.6"
+crypto-bigint = { path = "../crypto-bigint" }
 finite_fields = { path = "../finite_fields" }
+fiat_shamir = { path = "../fiat_shamir" }
+merkle_tree = { path = "../merkle_tree" }
+polynomials = { path = "../polynomials" }
+serdect = { version = "0.3", optional = true, default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_with = "3.12.0"
+serde_json = "1.0"

@@ -1,14 +1,65 @@
+use core::fmt;
 use std::ops::*;
 use crypto_bigint::{NonZero, I256, I512, U256};
 
 use extended_gcd::{ExtendedGCDResult, extended_gcd};
+use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Serialize};
 
 /// Finite field element, with value `val` and belonging to the finite field `ff`
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Hash)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Copy, Hash)]
 pub struct IntMod <const P : NonZero<U256>, const G : NonZero<U256>> {
     /// `val` denotes the value of the integer modulo `P`
     pub val : I256
 }
+
+impl<const P : NonZero<U256>, const G : NonZero<U256>> Serialize for IntMod<P, G> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+            let words = self.val.to_words();
+            let mut seq = serializer.serialize_seq(Some(4))?;
+            seq.serialize_element(&words[0])?;
+            seq.serialize_element(&words[1])?;
+            seq.serialize_element(&words[2])?;
+            seq.serialize_element(&words[3])?;
+            seq.end()
+    }
+}
+
+impl<'de, const P : NonZero<U256>, const G : NonZero<U256>> Deserialize<'de> for IntMod<P, G> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> {
+            struct U64SeqVisitor;
+
+            impl<'de> Visitor<'de> for U64SeqVisitor {
+                type Value = [u64; 4];
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str(stringify!(u64))
+                }
+
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                    where
+                        A: serde::de::SeqAccess<'de>, {
+
+                        let mut res = Vec::new();
+                        while let Some (v) = seq.next_element()? {
+                            res.push(v)
+                        }
+
+                        assert_eq! (res.len(), 4);
+
+                        // Sorry :)
+                        Ok([res[0], res[1], res[2], res[3]])
+                }
+            }
+
+            Ok(IntMod { val: I256::from_words(deserializer.deserialize_seq(U64SeqVisitor)?) })
+
+    }
+}
+
 
 /// ZpElement is a FiniteFieldElement and implements the `Add` trait
 impl<const P : NonZero<U256>, const G : NonZero<U256>> Add for IntMod<P, G> {
@@ -123,15 +174,23 @@ impl<const P : NonZero<U256>, const G : NonZero<U256>> BitXor for IntMod<P, G> {
     type Output = Self;
 
     fn bitxor (self, exp : Self) -> Self {
+        #[allow(non_snake_case)]
+        let P_i512 : NonZero<I512> = NonZero::new(P.as_int().widening_mul(&I256::ONE)).unwrap();
+
         let mut res = I256::ONE;
         let mut _a = self.val;
         let mut _b = exp.val;
 
         while _b > I256::ZERO {
             if _b & I256::ONE == I256::ONE {
-                res = (res * _a) % P;
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let res_i512 : [crypto_bigint::Limb; 8] = (res.widening_mul(&_a) % P_i512).to_limbs();
+
+                res = I256::new([ res_i512[0], res_i512[1], res_i512[2], res_i512[3] ]);
             }
-            _a = (_a * _a) % P;
+
+            let _a_i512 : [crypto_bigint::Limb; 8] = (_a.widening_mul(&_a) % P_i512).to_limbs();
+            _a = I256::new([ _a_i512[0], _a_i512[1], _a_i512[2], _a_i512[3] ]);
             _b >>= 1
         }
 
@@ -162,7 +221,7 @@ impl<const P : NonZero<U256>, const G : NonZero<U256>> IntMod<P, G> {
     /// Returns the value in the finite field
     pub fn inverse (&self) -> Self {
         let ExtendedGCDResult { x, y: _, g: _ } = extended_gcd(self.val, P.as_int());
-        IntMod { val: x }
+        IntMod { val: ((x % P) + P.as_int()) % P }
     }
 }
 
@@ -208,6 +267,12 @@ impl<const P : NonZero<U256>, const G : NonZero<U256>> From<usize> for IntMod<P,
     }
 }
 
+impl<const P : NonZero<U256>, const G : NonZero<U256>> fmt::Debug for IntMod<P, G> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\"0x{}\"", self.val.to_string())
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -226,5 +291,15 @@ mod tests {
         let odd = IntPG::from(29);
 
         assert_eq!(odd % crate::constant(I256::from(2)), crate::ONE);
+    }
+
+    #[test]
+    fn test_serde () {
+        let value = crate::constant(I256::from(-120));
+
+        let serialized = serde_json::to_string(&value).unwrap();
+        let deserialized: IntPG = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(value, deserialized);
     }
 }

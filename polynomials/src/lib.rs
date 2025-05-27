@@ -1,3 +1,3 @@
-mod degree;
-mod polynomial;
-mod multivar_polynomial;
+pub mod degree;
+pub mod polynomial;
+pub mod multivar_polynomial;

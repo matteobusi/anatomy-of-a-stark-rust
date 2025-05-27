@@ -4,11 +4,11 @@ use std::ops::{Add, Div, Mul, Sub};
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone)]
 pub enum Degree {
     MinusInf,
-    Poly (u64)
+    Poly (u128)
 }
 
 impl Degree {
-    pub fn unwrap (self) -> u64 {
+    pub fn unwrap (self) -> u128 {
         match self {
             Degree::MinusInf => panic!("Cannot unwrap a -inf degree"),
             Degree::Poly(n) => n
