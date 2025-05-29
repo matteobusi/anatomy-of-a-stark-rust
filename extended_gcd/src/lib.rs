@@ -1,27 +1,27 @@
-use crypto_bigint::{NonZero, I256};
+use crypto_bigint::{NonZero, I512};
 
 // x and y are Bezout coefficients and g is the gcd (a, b), this means
 // ax + by = g
 #[derive(PartialEq, Eq, Debug)]
 pub struct ExtendedGCDResult {
-    pub x : I256,
-    pub y : I256,
-    pub g : I256
+    pub x : I512,
+    pub y : I512,
+    pub g : I512
 }
 
-pub fn gcd (a : I256, b : I256) -> I256 {
-    if b == I256::ZERO {
+pub fn gcd (a : I512, b : I512) -> I512 {
+    if b == I512::ZERO {
         a
     } else {
         gcd (b, a % NonZero::new(b).expect("Never happens!"))
     }
 }
 
-pub fn extended_gcd (a : I256, b : I256) -> ExtendedGCDResult {
-    if b == I256::ZERO {
+pub fn extended_gcd (a : I512, b : I512) -> ExtendedGCDResult {
+    if b == I512::ZERO {
         ExtendedGCDResult {
-            x : I256::ONE,
-            y : I256::ZERO,
+            x : I512::ONE,
+            y : I512::ZERO,
             g : a
         }
     } else {

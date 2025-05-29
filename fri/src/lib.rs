@@ -1,5 +1,5 @@
 use blake2::{Blake2b512, Digest};
-use crypto_bigint::{NonZero, I256, U512};
+use crypto_bigint::{NonZero, U512};
 
 use fiat_shamir::ProofStream;
 use finite_fields::IntPG;
@@ -96,7 +96,7 @@ impl Fri {
 
     fn commit (&self, codeword: &[IntPG], ps : &mut ProofStream<ProofObj>) -> Vec<Vec<IntPG>> {
         #[allow(non_snake_case)]
-        let TWO = finite_fields::constant(I256::from(2));
+        let TWO = IntPG::from(2);
 
         let mut omega = self.omega;
         let mut offset = self.offset;
@@ -126,8 +126,8 @@ impl Fri {
 
                 // And finally, split and fold
                 codeword = (0..N/2).map(|i| TWO.inverse() * (
-                        ((finite_fields::ONE + alpha / (offset * (omega^i.into())))*codeword[i]) +
-                        ((finite_fields::ONE - alpha / (offset * (omega^i.into())))*codeword[N/2 + i]))).collect();
+                        ((IntPG::ONE + alpha / (offset * (omega^i.into())))*codeword[i]) +
+                        ((IntPG::ONE - alpha / (offset * (omega^i.into())))*codeword[N/2 + i]))).collect();
 
                 omega ^= 2.into();
                 offset ^= 2.into();
@@ -392,16 +392,16 @@ mod tests {
         assert_eq! (1 << log_codeword_len, initial_codeword_len);
 
         let omega = finite_fields::primitive_nth_root(initial_codeword_len);
-        let generator = finite_fields::constant(finite_fields::SIGNED_G);
+        let generator = IntPG::constant(&finite_fields::SIGNED_G);
 
-        assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), finite_fields::ONE);
-        assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), finite_fields::ONE);
+        assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), IntPG::ONE);
+        assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), IntPG::ONE);
 
         let fri = Fri::new(generator, omega, initial_codeword_len as usize, expansion_factor as u128, num_colinearity_tests);
 
-        let coefficients : Vec<_> = (0..degree+1).map(|i| finite_fields::constant(I256::from(i))).collect();
+        let coefficients : Vec<_> = (0..degree+1).map(IntPG::from).collect();
         let poly = Polynomial::new(&coefficients);
-        let domain = (0..initial_codeword_len).map(|i| omega ^ finite_fields::constant(I256::from(i))).collect::<Vec<IntPG>>();
+        let domain = (0..initial_codeword_len).map(|i| omega ^ IntPG::from(i)).collect::<Vec<IntPG>>();
 
         let codeword = poly.evaluate_domain(&domain);
 
@@ -416,11 +416,11 @@ mod tests {
         match verdict {
             Ok(()) => {
                 for (x, y) in points {
-                    let v = omega^finite_fields::constant(I256::from(x as i128));
+                    let v = omega^IntPG::from(x as i128);
                     assert_eq!(poly.evaluate(&v), y, "Polynomial evaluates to the wrong value!");
                 }
             },
-            Err(_) => panic!("Proof rejected but it should be valid!")
+            Err(e) => panic!("Proof rejected but it should be valid: {}", e)
         }
 
     }
@@ -442,16 +442,16 @@ mod tests {
         assert_eq! (1 << log_codeword_len, initial_codeword_len);
 
         let omega = finite_fields::primitive_nth_root(initial_codeword_len);
-        let generator = finite_fields::constant(finite_fields::SIGNED_G);
+        let generator = IntPG::constant(&finite_fields::SIGNED_G);
 
-        assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), finite_fields::ONE);
-        assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), finite_fields::ONE);
+        assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), IntPG::ONE);
+        assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), IntPG::ONE);
 
         let fri = Fri::new(generator, omega, initial_codeword_len as usize, expansion_factor as u128, num_colinearity_tests);
 
-        let coefficients : Vec<_> = (0..degree+1).map(|i| finite_fields::constant(I256::from(i))).collect();
+        let coefficients : Vec<_> = (0..degree+1).map(IntPG::from).collect();
         let poly = Polynomial::new(&coefficients);
-        let domain = (0..initial_codeword_len).map(|i| omega ^ finite_fields::constant(I256::from(i))).collect::<Vec<IntPG>>();
+        let domain = (0..initial_codeword_len).map(|i| omega ^ IntPG::from(i)).collect::<Vec<IntPG>>();
 
         let mut codeword = poly.evaluate_domain(&domain);
 
@@ -460,7 +460,7 @@ mod tests {
         // Disturb the stream to invalidate the proof
         let mut ps = ProofStream::<ProofObj>::default();
         for i in 0..degree/3 {
-            codeword[i as usize] = finite_fields::ZERO;
+            codeword[i as usize] = IntPG::ZERO;
         }
 
         fri.prove(&codeword, &mut ps);

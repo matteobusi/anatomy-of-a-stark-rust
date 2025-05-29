@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ops::{Add, BitXor, Mul, Neg, Sub};
 
-use crypto_bigint::I256;
 use finite_fields::IntPG;
 use crate::polynomial::Polynomial;
 
@@ -49,7 +48,7 @@ impl Add for MPolynomial {
             // Now, go over each pair in the monomial_map of self, modify the key with proper padding according to num_variables and insert the new association in res_map
             for (k, v) in self.monomial_map {
                 let mut padded_key = k.clone();
-                padded_key.append(&mut vec![finite_fields::ZERO; num_variables - k.len()]);
+                padded_key.append(&mut vec![IntPG::ZERO; num_variables - k.len()]);
 
                 assert_eq!(res_map.insert(padded_key, v), None);
             }
@@ -57,7 +56,7 @@ impl Add for MPolynomial {
             // This is similar to the above, except that if the mapping already exists we need to updated said mapping with the appropriate sum of coefficients
             for (k, v) in rhs.monomial_map {
                 let mut padded_key = k.clone();
-                padded_key.append(&mut vec![finite_fields::ZERO; num_variables - k.len()]);
+                padded_key.append(&mut vec![IntPG::ZERO; num_variables - k.len()]);
 
                 match res_map.get(&k) {
                     None => res_map.insert(padded_key, v),
@@ -89,7 +88,7 @@ impl Mul for MPolynomial {
 
         for (k0, v0) in &self.monomial_map {
             for (k1, v1) in &rhs.monomial_map {
-                let mut monomial = vec![finite_fields::ZERO; num_variables];
+                let mut monomial = vec![IntPG::ZERO; num_variables];
 
                 for i in 0..k0.len() {
                     monomial[i] += k0[i];
@@ -117,21 +116,21 @@ impl BitXor<IntPG> for MPolynomial {
     fn bitxor(self, exp: IntPG) -> MPolynomial {
         if self.is_zero() {
             MPolynomial::ZERO()
-        } else if exp == finite_fields::ZERO {
+        } else if exp == IntPG::ZERO {
             MPolynomial::ONE()
         } else {
             let mut _base = self.clone();
             let mut _exp = exp;
-            let two_ff = finite_fields::constant(I256::from(2));
+            let two_ff = IntPG::from(2);
 
             let mut res = MPolynomial::ONE();
-            while _exp > finite_fields::ZERO {
-                if _exp % two_ff == finite_fields::ONE {
+            while _exp > IntPG::ZERO {
+                if _exp % two_ff == IntPG::ONE {
                     res = res * _base.clone();
                 }
 
                 _base = _base.clone() * _base.clone();
-                _exp.val >>= 1;
+                _exp >>= 1; // FIXME: investigate if this works
             }
 
             res
@@ -179,30 +178,30 @@ impl MPolynomial {
 
     pub fn constant (c : IntPG) -> MPolynomial {
         let mut monomial_map = HashMap::new();
-        monomial_map.insert(vec![finite_fields::ZERO], c);
+        monomial_map.insert(vec![IntPG::ZERO], c);
 
         MPolynomial { monomial_map }
     }
 
     #[allow(non_snake_case)]
     pub fn ONE () -> MPolynomial {
-        MPolynomial::constant(finite_fields::ONE)
+        MPolynomial::constant(IntPG::ONE)
     }
 
     pub fn is_zero (&self) -> bool {
-        self.monomial_map.is_empty() || self.monomial_map.values().all(|v| *v == finite_fields::ZERO)
+        self.monomial_map.is_empty() || self.monomial_map.values().all(|v| *v == IntPG::ZERO)
     }
 
     pub fn variables (num_variables : usize) -> Vec<MPolynomial> {
         let mut variables = Vec::new();
 
         for i in 0..num_variables {
-            let mut monomial_map_key = vec![finite_fields::ZERO; i];
-            monomial_map_key.extend(vec![finite_fields::ONE; 1]);
-            monomial_map_key.extend(vec![finite_fields::ZERO; num_variables - i - 1]);
+            let mut monomial_map_key = vec![IntPG::ZERO; i];
+            monomial_map_key.extend(vec![IntPG::ONE; 1]);
+            monomial_map_key.extend(vec![IntPG::ZERO; num_variables - i - 1]);
 
             let mut monomial_map = HashMap::new();
-            monomial_map.insert(monomial_map_key, finite_fields::ONE);
+            monomial_map.insert(monomial_map_key, IntPG::ONE);
 
             let variable = MPolynomial::new(monomial_map);
             variables.push(variable);
@@ -223,7 +222,7 @@ impl MPolynomial {
     }
 
     pub fn evaluate (&self, point : Vec<IntPG>) -> IntPG {
-        let mut value = finite_fields::ZERO;
+        let mut value = IntPG::ZERO;
 
         for (k, v) in &self.monomial_map {
             let mut monomial_value = *v;
@@ -258,21 +257,21 @@ impl MPolynomial {
 mod tests {
     // use super::*;
 
-    // use crypto_bigint::I256;
+    // use crypto_bigint::I512;
 
     // #[test]
     // fn test_neg () {
-    //     let v = MPolynomial::constant(IntPG { val: I256::from(42) });
-    //     let mv = MPolynomial::constant(IntPG { val: I256::from(-42) });
+    //     let v = MPolynomial::constant(IntPG { val: I512::from(42) });
+    //     let mv = MPolynomial::constant(IntPG { val: I512::from(-42) });
     //     assert_eq!(-v, mv)
     // }
 
     // #[test]
     // fn test_add () {
-    //     let c1 = IntPG { val : I256::from(42) };
-    //     let c2 = IntPG { val : I256::from(7) };
-    //     let csum1 = IntPG { val : I256::from(49)};
-    //     let csum2 = IntPG { val : I256::from(42)};
+    //     let c1 = IntPG { val : I512::from(42) };
+    //     let c2 = IntPG { val : I512::from(7) };
+    //     let csum1 = IntPG { val : I512::from(49)};
+    //     let csum2 = IntPG { val : I512::from(42)};
 
     //     let p1 = Polynomial { coefficients: vec![c1; 10]};
     //     let p2 = Polynomial { coefficients: vec![c2; 4]};
@@ -288,18 +287,18 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 5, 2].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [0, 5, 5, 2].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
     //     let b =
     //         Polynomial {
     //             coefficients:
-    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let c =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     assert_eq!(a.clone() * (b.clone() + c.clone()), a.clone()*b.clone() + a.clone()*c.clone())
@@ -309,12 +308,12 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 5, 2].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [0, 5, 5, 2].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
     //     let b =
     //         Polynomial {
     //             coefficients:
-    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
 
@@ -326,12 +325,12 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
     //     let b =
     //         Polynomial {
     //             coefficients:
-    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let DivOutput { quotient, remainder } = (a.clone() * b.clone())/b.clone();
@@ -344,18 +343,18 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
     //     let b =
     //         Polynomial {
     //             coefficients:
-    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let c =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let DivOutput { quotient: _, remainder } = (a.clone() * b.clone())/c.clone();
@@ -367,18 +366,18 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [1, 0, 5, 2].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
     //     let b =
     //         Polynomial {
     //             coefficients:
-    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [2, 2, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let c =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect()
+    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect()
     //         };
 
     //     let DivOutput { quotient, remainder } = (a.clone() * b.clone())/c.clone();
@@ -390,7 +389,7 @@ mod tests {
     //     let a =
     //         Polynomial {
     //             coefficients:
-    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect() // x+1
+    //                 [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect() // x+1
     //         };
 
     //     assert_eq!(a.clone() ^ 7, a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone());
@@ -400,7 +399,7 @@ mod tests {
     // fn test_interpolate () {
     //     let pairs: Vec<(IntPG, IntPG)> = [(1, 15), (9, 295), (10, 357)].iter().map(
     //         |(x, y)|
-    //             (IntPG { val : I256::from(*x) }, IntPG { val : I256::from(*y) })
+    //             (IntPG { val : I512::from(*x) }, IntPG { val : I512::from(*y) })
     //         ).collect();
 
     //     let res = Polynomial::interpolate(&pairs);
@@ -414,12 +413,12 @@ mod tests {
 
     // #[test]
     // fn test_zerofier () {
-    //     let domain = [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I256::from(*x) }) ).collect();
+    //     let domain = [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG { val : I512::from(*x) }) ).collect();
 
     //     let res = Polynomial::zerofier(&domain);
 
     //     for x in domain {
-    //         assert_eq!(res.evaluate(&x), finite_fields::ZERO);
+    //         assert_eq!(res.evaluate(&x), IntPG::ZERO);
     //     }
     // }
 }
