@@ -1,6 +1,6 @@
 use core::fmt;
 use std::ops::*;
-use crypto_bigint::{NonZero, I512, I1024, U512};
+use crypto_bigint::{ConstChoice, NonZero, I512, U1024, U512};
 
 use extended_gcd::{ExtendedGCDResult, extended_gcd};
 use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Serialize};
@@ -9,7 +9,7 @@ use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Serialize};
 #[derive(Clone, PartialOrd, Ord, Copy, PartialEq, Eq, Hash)]
 pub struct IntMod <const P : NonZero<U512>, const G : NonZero<U512>> {
     /// `val` denotes the value of the integer modulo `P`
-    val : I512
+    val : U512
 }
 
 // The implementation for PartialEq and Eq should be the following, but by careful use of private val we can avoid fiddling with PartialEq default implementation
@@ -24,15 +24,15 @@ pub struct IntMod <const P : NonZero<U512>, const G : NonZero<U512>> {
 
 impl<const P : NonZero<U512>, const G : NonZero<U512>> IntMod<P, G> {
     /// Lifts a I512 value into `IntMod<P, G>`
-    pub fn constant (c : &I512) -> Self {
-        Self { val : (c % P) }
+    pub fn constant (c : &U512) -> Self {
+        Self { val : c%P }
     }
 
     /// The ZERO element of the finite field `IntMod<P, G>`
-    pub const ZERO : Self = Self { val: I512::ZERO };
+    pub const ZERO : Self = Self { val: U512::ZERO };
 
     /// The ONE element of the finite field `IntMod<P, G>`
-    pub const ONE : Self = Self { val: I512::ONE };
+    pub const ONE : Self = Self { val: U512::ONE };
 }
 
 
@@ -83,7 +83,7 @@ impl<'de, const P : NonZero<U512>, const G : NonZero<U512>> Deserialize<'de> for
                 }
             }
 
-            Ok(IntMod { val: I512::from_words(deserializer.deserialize_seq(U64SeqVisitor)?) })
+            Ok(IntMod::constant(&U512::from_words(deserializer.deserialize_seq(U64SeqVisitor)?)))
 
     }
 }
@@ -96,23 +96,22 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Add for IntMod<P, G> {
     fn add (self, rhs : Self) -> Self {
         // This is not the most efficient way, but it is the easiest
         // Notice that the widening is just internal, thanks to the modulus
-        let self_i1024 : I1024 = self.val.widening_mul(&I512::ONE);
-        let rhs_i1024 : I1024 = rhs.val.widening_mul(&I512::ONE);
+        let self_u1024 : U1024 = self.val.widening_mul(&U512::ONE);
+        let rhs_u1024 : U1024 = rhs.val.widening_mul(&U512::ONE);
 
         #[allow(non_snake_case)]
-        let P_i1024 : NonZero<I1024> = NonZero::new(P.as_int().widening_mul(&I512::ONE)).unwrap();
+        let P_u1024 : NonZero<U1024> = NonZero::new(P.widening_mul(&U512::ONE)).unwrap();
 
-        let res_i1024 = (self_i1024 + rhs_i1024) % P_i1024;
+        // We need to make sure this fits in 512 bits
+        let res_u1024 = (self_u1024 + rhs_u1024)%P_u1024;
 
-        let res_i1024_limbs = res_i1024.to_limbs();
-        let res : I512 = I512::new([
-            res_i1024_limbs[0], res_i1024_limbs[1], res_i1024_limbs[2], res_i1024_limbs[3],
-            res_i1024_limbs[4], res_i1024_limbs[5], res_i1024_limbs[6], res_i1024_limbs[7]
+        let res_u1024_limbs = res_u1024.to_limbs();
+        let res : U512 = U512::new([
+            res_u1024_limbs[0], res_u1024_limbs[1], res_u1024_limbs[2], res_u1024_limbs[3],
+            res_u1024_limbs[4], res_u1024_limbs[5], res_u1024_limbs[6], res_u1024_limbs[7]
         ]);
 
-        IntMod {
-            val : res
-        }
+        IntMod::constant(&res)
     }
 }
 
@@ -128,9 +127,7 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Sub for IntMod<P, G> {
     type Output = Self;
 
     fn sub (self, rhs : Self) -> Self {
-        IntMod {
-            val : (P.as_int() + self.val - rhs.val) % P,
-        }
+        IntMod::constant(&(P.get() + self.val - rhs.val))
     }
 }
 
@@ -149,18 +146,16 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Mul for IntMod<P, G> {
         // This is not the most efficient way, but it is the easiest
         // Notice that the widening is just internal, thanks to the modulus
         #[allow(non_snake_case)]
-        let P_i1024 : NonZero<I1024> = NonZero::new(P.as_int().widening_mul(&I512::ONE)).unwrap();
+        let P_u1024 : NonZero<U1024> = NonZero::new(P.get().widening_mul(&U512::ONE)).unwrap();
 
         #[allow(clippy::suspicious_arithmetic_impl)]
-        let res_i1024: [crypto_bigint::Limb; 16] = (self.val.widening_mul(&rhs.val) % P_i1024).to_limbs();
-        let res : I512 = I512::new([
-            res_i1024[0], res_i1024[1], res_i1024[2], res_i1024[3],
-            res_i1024[4], res_i1024[5], res_i1024[6], res_i1024[7]
+        let res_u1024: [crypto_bigint::Limb; 16] = (self.val.widening_mul(&rhs.val) % P_u1024).to_limbs();
+        let res : U512 = U512::new([
+            res_u1024[0], res_u1024[1], res_u1024[2], res_u1024[3],
+            res_u1024[4], res_u1024[5], res_u1024[6], res_u1024[7]
         ]);
 
-        IntMod {
-            val : res
-        }
+        IntMod::constant(&res)
     }
 }
 
@@ -176,15 +171,26 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Div for IntMod<P, G> {
     type Output = Self;
 
     fn div (self, denominator : IntMod<P, G>) -> Self {
-        if denominator.val == I512::ZERO {
+        if denominator.val == U512::ZERO {
             panic!("Zero is an invalid denominator!");
         }
 
-        let ExtendedGCDResult { x, y: _, g: _ } = extended_gcd(denominator.val, P.as_int());
+        let signed_den = I512::new_from_abs_sign(denominator.val, ConstChoice::FALSE).unwrap();
+        #[allow(non_snake_case)]
+        let signed_P = I512::new_from_abs_sign(P.get(), ConstChoice::FALSE).unwrap();
 
-        IntMod {
-            val : (self.val * x) % P
-        }
+        let ExtendedGCDResult { x, y: _, g: _ } = extended_gcd(signed_den, signed_P);
+
+        let x = x.normalized_rem(&P);
+        // dbg!(denominator.val);
+        // dbg!(P.get());
+        // dbg!(self.val);
+        // dbg!(x);
+        // dbg!(self.val * x);
+        // dbg!((self.val * x) % P);
+        // assert!(false);
+
+        IntMod::constant(&(self.val * x))
     }
 }
 
@@ -218,7 +224,7 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Rem for IntMod<P, G> {
 
     fn rem (self, denominator : IntMod<P, G>) -> Self {
         IntMod {
-            val: (self.val - denominator.val * (self.val / NonZero::new(denominator.val).unwrap()).unwrap()) % P
+            val: (self.val - denominator.val * (self.val / NonZero::new(denominator.val).unwrap())) % P
         }
     }
 }
@@ -229,32 +235,32 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> BitXor for IntMod<P, G> {
 
     fn bitxor (self, exp : Self) -> Self {
         #[allow(non_snake_case)]
-        let P_i1024 : NonZero<I1024> = NonZero::new(P.as_int().widening_mul(&I512::ONE)).unwrap();
+        let P_u1024 : NonZero<U1024> = NonZero::new(P.get().widening_mul(&U512::ONE)).unwrap();
 
-        let mut res = I512::ONE;
+        let mut res = U512::ONE;
         let mut _a = self.val;
         let mut _b = exp.val;
 
-        while _b > I512::ZERO {
-            if _b & I512::ONE == I512::ONE {
+        while _b > U512::ZERO {
+            if _b & U512::ONE == U512::ONE {
                 #[allow(clippy::suspicious_arithmetic_impl)]
-                let res_i1024 : [crypto_bigint::Limb; 16] = (res.widening_mul(&_a) % P_i1024).to_limbs();
+                let res_u1024 : [crypto_bigint::Limb; 16] = (res.widening_mul(&_a) % P_u1024).to_limbs();
 
-                res = I512::new([
-                    res_i1024[0], res_i1024[1], res_i1024[2], res_i1024[3],
-                    res_i1024[4], res_i1024[5], res_i1024[6], res_i1024[7]
+                res = U512::new([
+                    res_u1024[0], res_u1024[1], res_u1024[2], res_u1024[3],
+                    res_u1024[4], res_u1024[5], res_u1024[6], res_u1024[7]
                 ]);
             }
 
-            let _a_i1024 : [crypto_bigint::Limb; 16] = (_a.widening_mul(&_a) % P_i1024).to_limbs();
-            _a = I512::new([
-                _a_i1024[0], _a_i1024[1], _a_i1024[2], _a_i1024[3],
-                _a_i1024[4], _a_i1024[5], _a_i1024[6], _a_i1024[7],
+            let _a_u1024 : [crypto_bigint::Limb; 16] = (_a.widening_mul(&_a) % P_u1024).to_limbs();
+            _a = U512::new([
+                _a_u1024[0], _a_u1024[1], _a_u1024[2], _a_u1024[3],
+                _a_u1024[4], _a_u1024[5], _a_u1024[6], _a_u1024[7],
             ]);
             _b >>= 1
         }
 
-        IntMod { val: res }
+        IntMod { val: res%P }
     }
 }
 
@@ -271,7 +277,7 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Neg for IntMod<P, G> {
 
     fn neg (self) -> Self {
         IntMod {
-            val: (P.as_int() - self.val) % P,
+            val: (P.get() - self.val) % P,
         }
     }
 }
@@ -280,56 +286,107 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> Neg for IntMod<P, G> {
 impl<const P : NonZero<U512>, const G : NonZero<U512>> IntMod<P, G> {
     /// Returns the value in the finite field
     pub fn inverse (&self) -> Self {
-        let ExtendedGCDResult { x, y: _, g: _ } = extended_gcd(self.val, P.as_int());
-        IntMod { val: ((x % P) + P.as_int()) % P }
+        let signed_self = I512::new_from_abs_sign(self.val, ConstChoice::FALSE).unwrap();
+        #[allow(non_snake_case)]
+        let signed_P = I512::new_from_abs_sign(P.get(), ConstChoice::FALSE).unwrap();
+
+        let ExtendedGCDResult { x, y: _, g: _ } = extended_gcd(signed_self, signed_P);
+
+        let x = x.normalized_rem(&P);
+        IntMod { val: (x + P.get()) % P }
     }
 }
 
-/// Create a ZpElement from an i8
-impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i8> for IntMod<P, G> {
-    fn from(value: i8) -> Self {
-        IntMod::constant(&I512::from(value))
+/// Create a ZpElement from an u8
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<u8> for IntMod<P, G> {
+    fn from(value: u8) -> Self {
+        IntMod::constant(&U512::from(value))
     }
 }
 
-/// Create a ZpElement from an i16
-impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i16> for IntMod<P, G> {
-    fn from(value: i16) -> Self {
-        IntMod::constant(&I512::from(value))
+/// Create a ZpElement from an u16
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<u16> for IntMod<P, G> {
+    fn from(value: u16) -> Self {
+        IntMod::constant(&U512::from(value))
     }
 }
 
-/// Create a ZpElement from an i32
-impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i32> for IntMod<P, G> {
-    fn from(value: i32) -> Self {
-        IntMod::constant(&I512::from(value))
+/// Create a ZpElement from an u32
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<u32> for IntMod<P, G> {
+    fn from(value: u32) -> Self {
+        IntMod::constant(&U512::from(value))
     }
 }
 
-/// Create a ZpElement from an i64
-impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i64> for IntMod<P, G> {
-    fn from(value: i64) -> Self {
-        IntMod::constant(&I512::from(value))
+/// Create a ZpElement from an u64
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<u64> for IntMod<P, G> {
+    fn from(value: u64) -> Self {
+        IntMod::constant(&U512::from(value))
     }
 }
 
-/// Create a ZpElement from an i128
-impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i128> for IntMod<P, G> {
-    fn from(value: i128) -> Self {
-        IntMod::constant(&I512::from(value))
+/// Create a ZpElement from an u128
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<u128> for IntMod<P, G> {
+    fn from(value: u128) -> Self {
+        IntMod::constant(&U512::from(value))
     }
 }
 
 /// Create a ZpElement from an usize
 impl<const P : NonZero<U512>, const G : NonZero<U512>> From<usize> for IntMod<P, G> {
     fn from(value: usize) -> Self {
-        IntMod { val: I512::from_i128(value as i128) } // This should suffice in avoiding overflows with conversion from unsigned to signed
+        IntMod { val: U512::from_u128(value as u128)%P } // This should suffice in avoiding overflows with conversion from unsigned to signed
+
+    }
+}
+
+/// Create a ZpElement from an i32
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i16> for IntMod<P, G> {
+    fn from(value: i16) -> Self {
+        assert! (value >= 0);
+
+        IntMod { val: U512::from_u16(value as u16)%P }
+    }
+}
+/// Create a ZpElement from an i32
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i32> for IntMod<P, G> {
+    fn from(value: i32) -> Self {
+        assert! (value >= 0);
+
+        IntMod { val: U512::from_u32(value as u32)%P }
+
+    }
+}
+
+/// Create a ZpElement from an i64
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i64> for IntMod<P, G> {
+    fn from(value: i64) -> Self {
+        assert! (value >= 0);
+
+        IntMod { val: U512::from_u64(value as u64)%P }
+
+    }
+}
+
+/// Create a ZpElement from an i128
+impl<const P : NonZero<U512>, const G : NonZero<U512>> From<i128> for IntMod<P, G> {
+    fn from(value: i128) -> Self {
+        assert! (value >= 0);
+
+        IntMod { val: U512::from_u128(value as u128)%P }
+
     }
 }
 
 impl<const P : NonZero<U512>, const G : NonZero<U512>> fmt::Debug for IntMod<P, G> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "\"0x{}\"", self.val)
+        // Contrary to the library we want the sign ...
+        // if self.val.is_negative().into() {
+        //     let p_value : U512 = self.val * U512::from(-1);
+        //     write!(f, "- {}", p_value)
+        // } else {
+            write!(f, "{}", self.val)
+        // }
     }
 }
 
@@ -338,58 +395,57 @@ impl<const P : NonZero<U512>, const G : NonZero<U512>> fmt::Debug for IntMod<P, 
 mod tests {
     use crate::IntPG;
 
-    use crypto_bigint::I512;
+    use crypto_bigint::U512;
 
     #[test]
     fn test_add () {
-        let a = IntPG {
-            val : I512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008C0327E1D90D294ED1065674335548E9")
-        };
+        let a = IntPG::constant(&U512::from_be_hex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064C67A557940A1A6BF5F894F3B5B4AF4"));
 
-        let b = IntPG {
-            val : I512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8361D3FED200E4530DC4824AB3DC58B4")
-        };
+        let b = IntPG::constant(&U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007655E0F19802F30E2915BBD5F9018C3D"));
 
-        let expected = IntPG {
-            val : I512::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ba59a97ac578fb643aa0133df5a923d3")
-        };
+        let expected = IntPG::constant(&U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f9c5b47114394b4e8754525345cd730"));
 
         assert_eq!(a+b, expected);
     }
 
     #[test]
     fn test_mul () {
-        let a = IntPG {
-            val : I512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008C0327E1D90D294ED1065674335548E9")
-        };
+        let a = IntPG::constant(&U512::from_be_hex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064C67A557940A1A6BF5F894F3B5B4AF4"));
 
-        let b = IntPG {
-            val : I512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8361D3FED200E4530DC4824AB3DC58B4")
-        };
+        let b = IntPG::constant(&U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007655E0F19802F30E2915BBD5F9018C3D"));
 
-        let expected = IntPG {
-            val : I512::from_be_hex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000032297f3f23cce7ec5bf53bdd2cd6873e")
-        };
+        let expected = IntPG::constant(&U512::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c8842392a57b018f4ecfeadf09df1511"));
 
         assert_eq!(a*b, expected);
     }
 
     #[test]
-    fn test_rem_even () {
-        let even = IntPG::from(42);
+    fn test_div () {
+        let a = IntPG::constant(&U512::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a50c3796936d5035181e4468f1f81083"));
 
-        assert_eq!(even % IntPG::from(2), IntPG::ZERO);
+        let b = IntPG::constant(&U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004040fbed12ee470fb5038f9c18f6f7d1"));
+
+        let expected = IntPG::constant(&U512::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000508e83dc0a0b78912521d2d5026d0bda"));
+
+        assert_eq!(a/b, expected);
+    }
+
+    #[test]
+    fn test_rem_even () {
+        let even = IntPG::from(42u32);
+
+        assert_eq!(even % IntPG::from(2u32), IntPG::ZERO);
     }
     #[test]
     fn test_rem_odd () {
-        let odd = IntPG::from(29);
+        let odd = IntPG::from(29u32);
 
-        assert_eq!(odd % IntPG::from(2), IntPG::ONE);
+        assert_eq!(odd % IntPG::from(2u32), IntPG::ONE);
     }
 
     #[test]
     fn test_serde () {
-        let value = IntPG::from (-120);
+        let value = IntPG::from (120u32);
 
         let serialized = serde_json::to_string(&value).unwrap();
         let deserialized: IntPG = serde_json::from_str(&serialized).unwrap();

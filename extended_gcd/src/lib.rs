@@ -18,20 +18,17 @@ pub fn gcd (a : I512, b : I512) -> I512 {
 }
 
 pub fn extended_gcd (a : I512, b : I512) -> ExtendedGCDResult {
-    if b == I512::ZERO {
-        ExtendedGCDResult {
-            x : I512::ONE,
-            y : I512::ZERO,
-            g : a
-        }
-    } else {
-        let nzb = NonZero::new(b).expect("Never happens!");
-        let ExtendedGCDResult {x, y, g} = extended_gcd(b, a % nzb);
+    let (mut old_r, mut r) = (a, b);
+    let (mut old_s, mut s) = (I512::ONE, I512::ZERO);
+    let (mut old_t, mut t) = (I512::ZERO, I512::ONE);
 
-        ExtendedGCDResult {
-            x : y,
-            y : x - (a / nzb).expect("Never happens!") * y,
-            g
-        }
+    while r != I512::ZERO {
+        let quotient : I512 = old_r.checked_div(&r).expect("Never happens!");
+
+        (old_r, r) = (r, old_r - quotient * r);
+        (old_s, s) = (s, old_s - quotient * s);
+        (old_t, t) = (t, old_t - quotient * t);
     }
+
+    ExtendedGCDResult { x: old_s, y: old_t, g: old_r }
 }

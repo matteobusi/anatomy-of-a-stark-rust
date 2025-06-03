@@ -240,6 +240,13 @@ impl<const LIMBS: usize> num_traits::One for Int<LIMBS> {
 impl<const LIMBS: usize> fmt::Debug for Int<LIMBS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Int(0x{self:X})")
+        // FIXME: use the following if you need some clearer printing
+        // if self.is_negative().into() {
+        //     let p_value = self * Self::from(-1);
+        //     write!(f, "Int(- 0x{})", p_value)
+        // } else {
+        //     write!(f, "Int(0x{})", self)
+        // }
     }
 }
 

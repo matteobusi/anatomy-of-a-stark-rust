@@ -80,8 +80,6 @@ impl Fri {
         //      1. Commitment: the prover sends Merkle roots of codewords to the verifier, and the verifier supplies alpha, i.e., their random element of IntPG for the split-and-fold procedure
         let codewords = self.commit (codeword, ps);
 
-        println!("codewords: {:?}", codewords);
-
         //      2. Query: the verifier selects the leaf indexes, the prover opens them for verifier's co-linearity checks
         let top_level_indexes = self.sample_indexes (ps.prover_fiat_shamir(),  codewords[0].len()/2,  codewords[codewords.len()-1].len(), self.num_colinearity_tests);
         let mut indexes = top_level_indexes.clone();
@@ -103,6 +101,8 @@ impl Fri {
         let mut codewords: Vec<Vec<IntPG>> = Vec::new();
 
         let mut codeword = codeword.to_vec();
+        // dbg!(omega);
+        // dbg!(offset);
 
         for r in 0..self.num_rounds() {
             #[allow(non_snake_case)]
@@ -119,24 +119,45 @@ impl Fri {
             // If this is not the last round, prepare the values for the next
             if r < self.num_rounds() - 1 {
                 // Obtain the challenge
-                let alpha : IntPG = finite_fields::sample(&ps.prover_fiat_shamir());
+                let alpha : IntPG = finite_fields::sample(&ps.prover_fiat_shamir()); // FIXME: use this for debugging IntPG::constant(&U512::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a50c3796936d5035181e4468f1f81083"));
 
                 // Collect the codeword for later use
                 codewords.push(codeword.to_vec());
 
                 // And finally, split and fold
-                codeword = (0..N/2).map(|i| TWO.inverse() * (
-                        ((IntPG::ONE + alpha / (offset * (omega^i.into())))*codeword[i]) +
-                        ((IntPG::ONE - alpha / (offset * (omega^i.into())))*codeword[N/2 + i]))).collect();
+                let mut new_codeword = Vec::with_capacity(N/2);
+                for i in 0..N/2 {
+                    new_codeword.push(TWO.inverse() * (
+                        ((IntPG::ONE + alpha / (offset * (omega^i.into()))) * codeword[i]) +
+                        ((IntPG::ONE - alpha / (offset * (omega^i.into()))) * codeword[N/2 + i])
+                    ));
+                    // dbg!(i);
+                    // dbg!(TWO.inverse());
+                    // dbg!(IntPG::ONE);
+                    // dbg!(alpha);
+                    // dbg!(omega^i.into());
+                    // dbg!(offset * (omega^i.into()));
+                    // dbg!(alpha / (offset * (omega^i.into())));
+                }
+                codeword = new_codeword;
+                // codeword = (0..N/2).map(|i| TWO.inverse() * (
+                //         ((IntPG::ONE + alpha / (offset * (omega^i.into()))) * codeword[i]) +
+                //         ((IntPG::ONE - alpha / (offset * (omega^i.into()))) * codeword[N/2 + i])
+                // )).collect();
 
                 omega ^= 2.into();
                 offset ^= 2.into();
+                // dbg!(omega);
+                // dbg!(offset);
             }
         }
 
         // Send and collect the last codeword
         ps.push(ProofObj::CW(codeword.clone()));
         codewords.push(codeword.clone());
+
+        // dbg!(TWO.inverse());
+        // dbg!(&codewords);
 
         codewords
     }
@@ -250,6 +271,7 @@ impl Fri {
 
         // And extract the last codeword from the Proof stream, which should be the result of the commitment in the Merkle Tree
         let last_cw = ps.pull();
+        // dbg!(&last_cw);
 
         match last_cw {
             ProofObj::CW(last_cw) => {
@@ -275,8 +297,8 @@ impl Fri {
                 // Check 3: re-evaluate the codeword, it must match the original
                 let last_domain : Vec<_> = (0..last_cw.len()).map(|i| last_offset * (last_omega ^ IntPG::from(i))).collect();
 
-                println!("last_domain:\n{:?}", last_domain);
-                println!("last_cw:\n{:?}", last_cw);
+                // println!("let last_domain  : Vec<IntPG> = {:?}.iter().map(|x| IntPG::constant(&I512::from_be_hex(x))).collect();\n", last_domain);
+                // println!("let last_cw  : Vec<IntPG> = {:?}.iter().map(|x| IntPG::constant(&I512::from_be_hex(x))).collect();", last_cw);
                 // let last_points = last_domain.clone().into_iter().zip(last_cw.clone()).collect();
                 let poly = Polynomial::interpolate(&last_domain, &last_cw);
 
@@ -326,7 +348,7 @@ impl Fri {
                                 }
                             },
                             _ => {
-                                panic!("Expected a CWTriple in the proof streamm found {:?}", last_cw)
+                                panic!("Expected a CWTriple in the proof stream found {:?}", last_cw)
                             }
                         }
                     }
@@ -337,26 +359,26 @@ impl Fri {
                     let cc_mt : Vec<[u8; HL]> = Self::codeword_to_vec(&cc).iter().map(|v| v.0).collect();
 
                     for i in 0..self.num_colinearity_tests {
-                        match ps.pull() {
-                            ProofObj::MTAuthPath (path) => {
-                                let path: Vec<[u8; 64]> = path.iter().map(|n| n.0).collect();
-                                // The proof object has the right shape, let's verify it
-                                if !MerkleTree::verify(&roots[r+1], a_indexes[i], &path, &aa_mt[i]) {
-                                    return Result::Err("Merkle auth failed for aa");
-                                }
+                        let ProofObj::MTAuthPath(aa_path) = ps.pull() else { panic!("aa_path: Expected a MTAuthPath in the proof stream!") };
+                        let aa_path: Vec<[u8; 64]> = aa_path.iter().map(|n| n.0).collect();
+                        // Verify the Merkle tree path
+                        if !MerkleTree::verify(&roots[r], a_indexes[i], &aa_path, &aa_mt[i]) {
+                            return Result::Err("Merkle auth failed for aa");
+                        }
 
-                                if !MerkleTree::verify(&roots[r+1], b_indexes[i], &path, &bb_mt[i]) {
-                                    return Result::Err("Merkle auth failed for bb");
-                                }
+                        let ProofObj::MTAuthPath(bb_path) = ps.pull() else { panic!("bb_path: Expected a MTAuthPath in the proof stream!") };
+                        let bb_path: Vec<[u8; 64]> = bb_path.iter().map(|n| n.0).collect();
+                        // Verify the Merkle tree path
+                        if !MerkleTree::verify(&roots[r], b_indexes[i], &bb_path, &bb_mt[i]) {
+                            return Result::Err("Merkle auth failed for bb");
+                        }
 
-                                if !MerkleTree::verify(&roots[r+1], c_indexes[i], &path, &cc_mt[i]) {
-                                    return Result::Err("Merkle auth failed for cc");
-                                }
-                            },
-                            po => {
-                                panic!("Expected a MTAuthPath in the proof stream, found {:?}", po);
-                            }
-                        };
+                        let ProofObj::MTAuthPath(cc_path) = ps.pull() else { panic!("cc_path: Expected a MTAuthPath in the proof stream!") };
+                        let cc_path: Vec<[u8; 64]> = cc_path.iter().map(|n| n.0).collect();
+                        // Verify the Merkle tree path
+                        if !MerkleTree::verify(&roots[r+1], c_indexes[i], &cc_path, &cc_mt[i]) {
+                            return Result::Err("Merkle auth failed for cc");
+                        }
                     }
 
                     omega ^= IntPG::from(2);
@@ -392,7 +414,9 @@ mod tests {
         assert_eq! (1 << log_codeword_len, initial_codeword_len);
 
         let omega = finite_fields::primitive_nth_root(initial_codeword_len);
-        let generator = IntPG::constant(&finite_fields::SIGNED_G);
+        let generator = IntPG::constant(&finite_fields::G);
+
+        // dbg!(omega);
 
         assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), IntPG::ONE);
         assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), IntPG::ONE);
@@ -401,15 +425,23 @@ mod tests {
 
         let coefficients : Vec<_> = (0..degree+1).map(IntPG::from).collect();
         let poly = Polynomial::new(&coefficients);
+
+        // dbg!(&poly);
+
         let domain = (0..initial_codeword_len).map(|i| omega ^ IntPG::from(i)).collect::<Vec<IntPG>>();
 
+        // dbg!(&domain);
+
         let codeword = poly.evaluate_domain(&domain);
+
+        // dbg!(&codeword);
 
         // println!("{:?}", codeword);
 
         let mut ps = ProofStream::<ProofObj>::default();
 
         fri.prove(&codeword, &mut ps);
+
         let mut points = vec![];
         let verdict = fri.verify(&mut ps, &mut points);
 
@@ -442,7 +474,7 @@ mod tests {
         assert_eq! (1 << log_codeword_len, initial_codeword_len);
 
         let omega = finite_fields::primitive_nth_root(initial_codeword_len);
-        let generator = IntPG::constant(&finite_fields::SIGNED_G);
+        let generator = IntPG::constant(&finite_fields::G);
 
         assert_eq! (omega ^ IntPG::from(1 << log_codeword_len), IntPG::ONE);
         assert_ne! (omega ^ IntPG::from(1 << (log_codeword_len-1)), IntPG::ONE);
@@ -457,8 +489,9 @@ mod tests {
 
         // println!("{:?}", codeword);
 
-        // Disturb the stream to invalidate the proof
         let mut ps = ProofStream::<ProofObj>::default();
+
+        // Disturb the codeword to invalidate the proof
         for i in 0..degree/3 {
             codeword[i as usize] = IntPG::ZERO;
         }

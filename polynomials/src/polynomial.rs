@@ -1,13 +1,12 @@
 use std::ops::{Add, BitXor, Div, Mul, Neg, Rem, Sub};
 
-use crypto_bigint::I512;
 use finite_fields::IntPG;
 
 use crate::degree::*;
 
 #[derive(Debug, Clone)]
 pub struct Polynomial {
-    pub coefficients : Vec<IntPG>
+    pub coefficients: Vec<IntPG>,
 }
 
 impl PartialEq for Polynomial {
@@ -16,26 +15,29 @@ impl PartialEq for Polynomial {
     }
 }
 
-impl Eq for Polynomial { }
+impl Eq for Polynomial {}
 
 impl Neg for Polynomial {
     type Output = Self;
 
-    fn neg (self) -> Polynomial {
-        Polynomial { coefficients: self.coefficients.iter().map(|c| - (*c)).collect() }
+    fn neg(self) -> Polynomial {
+        Polynomial {
+            coefficients: self.coefficients.iter().map(|c| -(*c)).collect(),
+        }
     }
 }
 
 impl Add for Polynomial {
     type Output = Self;
 
-    fn add (self, rhs : Polynomial) -> Polynomial {
+    fn add(self, rhs: Polynomial) -> Polynomial {
         if rhs.clone().degree() == Degree::MinusInf {
             self
         } else if self.degree() == Degree::MinusInf {
             rhs
         } else {
-            let mut coefficients = vec![IntPG::ZERO; self.coefficients.len().max(rhs.coefficients.len())];
+            let mut coefficients =
+                vec![IntPG::ZERO; self.coefficients.len().max(rhs.coefficients.len())];
 
             for i in 0..self.coefficients.len() {
                 coefficients[i] += self.coefficients[i];
@@ -50,12 +52,11 @@ impl Add for Polynomial {
     }
 }
 
-
 impl Sub for Polynomial {
     type Output = Self;
 
-    fn sub (self, rhs : Polynomial) -> Polynomial {
-        self.add (-rhs)
+    fn sub(self, rhs: Polynomial) -> Polynomial {
+        self.add(-rhs)
     }
 }
 
@@ -66,7 +67,8 @@ impl Mul for Polynomial {
         if self.degree() == Degree::MinusInf || rhs.degree() == Degree::MinusInf {
             Polynomial::ZERO
         } else {
-            let mut coefficients = vec![IntPG::ZERO; self.coefficients.len() + rhs.coefficients.len() - 1]; // The -1 is there because the 0th element of the coefficient's vector is the 0-th degree variable
+            let mut coefficients =
+                vec![IntPG::ZERO; self.coefficients.len() + rhs.coefficients.len() - 1]; // The -1 is there because the 0th element of the coefficient's vector is the 0-th degree variable
 
             for i in 0..self.coefficients.len() {
                 if self.coefficients[i] == IntPG::ZERO {
@@ -74,7 +76,7 @@ impl Mul for Polynomial {
                 }
 
                 for j in 0..rhs.coefficients.len() {
-                    coefficients[i+j] += self.coefficients[i] * rhs.coefficients[j]
+                    coefficients[i + j] += self.coefficients[i] * rhs.coefficients[j]
                 }
             }
 
@@ -83,8 +85,8 @@ impl Mul for Polynomial {
     }
 }
 pub struct DivOutput {
-    pub quotient : Polynomial,
-    pub remainder : Polynomial
+    pub quotient: Polynomial,
+    pub remainder: Polynomial,
 }
 
 impl Div for Polynomial {
@@ -93,7 +95,10 @@ impl Div for Polynomial {
     fn div(self, denominator: Polynomial) -> DivOutput {
         match (self.degree(), denominator.degree()) {
             (_, Degree::MinusInf) => panic!("The ZERO polynomial is not a valid denominator!"),
-            (Degree::MinusInf, _) => DivOutput { quotient: Polynomial::ZERO, remainder: Polynomial::ZERO },
+            (Degree::MinusInf, _) => DivOutput {
+                quotient: Polynomial::ZERO,
+                remainder: Polynomial::ZERO,
+            },
             (Degree::Poly(n), Degree::Poly(m)) => {
                 let mut rem = self.clone();
                 let mut quotient_coeff = vec![IntPG::ZERO; (n - m + 1) as usize];
@@ -104,14 +109,18 @@ impl Div for Polynomial {
                     let mut sub_coefficients = vec![IntPG::ZERO; shift as usize];
                     sub_coefficients.push(coeff);
                     quotient_coeff[shift as usize] = coeff;
-                    let sub = (Polynomial { coefficients: sub_coefficients }) * denominator.clone();
+                    let sub = (Polynomial {
+                        coefficients: sub_coefficients,
+                    }) * denominator.clone();
 
                     rem = rem - sub;
                 }
 
                 DivOutput {
-                    quotient : Polynomial { coefficients: quotient_coeff },
-                    remainder: rem
+                    quotient: Polynomial {
+                        coefficients: quotient_coeff,
+                    },
+                    remainder: rem,
                 }
             }
         }
@@ -122,12 +131,14 @@ impl Rem for Polynomial {
     type Output = Polynomial;
 
     fn rem(self, rhs: Polynomial) -> Polynomial {
-        let DivOutput { quotient : _, remainder } = self.div(rhs);
+        let DivOutput {
+            quotient: _,
+            remainder,
+        } = self.div(rhs);
 
         remainder
     }
 }
-
 
 /// We use the bitwise xor notation (^) to denote exponentiation of the polynomial
 impl BitXor<IntPG> for Polynomial {
@@ -150,7 +161,7 @@ impl BitXor<IntPG> for Polynomial {
                 }
 
                 _base = _base.clone() * _base.clone();
-                _exp >>= 1; // FIXME: investigate if this works, or we should implement >>= on the finite field!
+                _exp >>= 1; // FIXME: investigate if this works
             }
 
             res
@@ -159,18 +170,24 @@ impl BitXor<IntPG> for Polynomial {
 }
 
 impl Polynomial {
-    pub fn new (coefficients : &[IntPG]) -> Polynomial {
-        Polynomial { coefficients: coefficients.to_vec() }
+    pub fn new(coefficients: &[IntPG]) -> Polynomial {
+        Polynomial {
+            coefficients: coefficients.to_vec(),
+        }
     }
 
-    pub const ZERO : Polynomial = Polynomial { coefficients : vec![] };
+    pub const ZERO: Polynomial = Polynomial {
+        coefficients: vec![],
+    };
 
     #[allow(non_snake_case)]
-    pub fn ONE () -> Polynomial {
-        Polynomial { coefficients : vec![ IntPG::ONE ] }
+    pub fn ONE() -> Polynomial {
+        Polynomial {
+            coefficients: vec![IntPG::ONE],
+        }
     }
 
-    pub fn degree (&self) -> Degree {
+    pub fn degree(&self) -> Degree {
         if self.coefficients.is_empty() {
             Degree::MinusInf
         } else {
@@ -185,18 +202,20 @@ impl Polynomial {
         }
     }
 
-    pub fn is_zero (&self) -> bool {
+    pub fn is_zero(&self) -> bool {
         self.degree() == Degree::MinusInf
     }
 
-    pub fn leading_coefficient (&self) -> IntPG {
+    pub fn leading_coefficient(&self) -> IntPG {
         match self.degree() {
-            Degree::MinusInf => panic! ("Cannot extract the leading coefficient from the ZERO polynomial"),
-            Degree::Poly(k) => self.coefficients[k as usize]
+            Degree::MinusInf => {
+                panic!("Cannot extract the leading coefficient from the ZERO polynomial")
+            }
+            Degree::Poly(k) => self.coefficients[k as usize],
         }
     }
 
-    pub fn evaluate (&self, x : &IntPG) -> IntPG {
+    pub fn evaluate(&self, x: &IntPG) -> IntPG {
         let mut xi = IntPG::ONE;
         let mut value = IntPG::ZERO;
 
@@ -208,41 +227,49 @@ impl Polynomial {
         value
     }
 
-    pub fn evaluate_domain (&self, domain : &[IntPG]) -> Vec<IntPG> {
+    pub fn evaluate_domain(&self, domain: &[IntPG]) -> Vec<IntPG> {
         domain.iter().map(|p| self.evaluate(p)).collect()
     }
 
     /// Given a non-empty vector of <x, f(x)> pairs computes the polynomial corresponding to the pairs.
-    pub fn interpolate (domain : &[IntPG], values : &[IntPG]) -> Self {
+    pub fn interpolate(domain: &[IntPG], values: &[IntPG]) -> Self {
         // Panics if no points are given or domain and values have different len
         assert!(!domain.is_empty());
         assert_eq!(domain.len(), values.len());
 
         // We use Langrange interpolation naively
         let x = Polynomial::new(&[IntPG::ZERO, IntPG::ONE]); // this is x
+        // dbg!(x.clone());
         let mut res = Polynomial::new(&[]); // this is our resulting polynomial, initially empty
+        // dbg!(res.clone());
 
         for i in 0..values.len() {
             let mut prod = Polynomial::new(&[values[i]]);
+            // dbg!(prod.clone());
             for j in 0..domain.len() {
                 if j != i {
                     let xj = Polynomial::new(&[domain[j]]);
+                    // dbg!(xj.clone());
                     let den = Polynomial::new(&[(domain[i] - domain[j]).inverse()]);
+                    // dbg!(den.clone());
                     prod = prod * ((x.clone() - xj) * den);
+                    // dbg!(prod.clone());
                     // let den = Polynomial::new(&[(domain[i] - domain[j])]);
                     // prod = prod * ((x.clone() - xj) / den).quotient;
                 }
             }
             res = res + prod;
+            // dbg!(res.clone());
         }
 
+        // dbg!(res.clone());
         res
     }
 
     /// Returns the (minimal) polynomial vanishing on the given points, i.e.,
     /// Given D = { d1, ..., dn }, the vanishing polynomial (or zerofier) is
     /// (x - d1) ... (x - dn)
-    pub fn zerofier (domain : &Vec<IntPG>) -> Polynomial {
+    pub fn zerofier(domain: &Vec<IntPG>) -> Polynomial {
         let x = Polynomial::new(&[IntPG::ZERO, IntPG::ONE]); // this is x
         let mut res = Polynomial::new(&[]); // this is our resulting polynomial, initially empty
 
@@ -254,19 +281,23 @@ impl Polynomial {
         res
     }
 
-    pub fn scale (self, factor : IntPG) -> Polynomial {
-        Polynomial { coefficients : self.coefficients.iter().enumerate().map(|(i, ci)| (
-            (factor ^ IntPG::from(i)) * (*ci))
-        ).collect() }
+    pub fn scale(self, factor: IntPG) -> Polynomial {
+        Polynomial {
+            coefficients: self
+                .coefficients
+                .iter()
+                .enumerate()
+                .map(|(i, ci)| ((factor ^ IntPG::from(i)) * (*ci)))
+                .collect(),
+        }
     }
 
-    pub fn test_colinearity (points : &[(IntPG, IntPG)]) -> bool {
-        let (domain, values) : (Vec<IntPG>, Vec<IntPG>) = points.iter().cloned().unzip();
+    pub fn test_colinearity(points: &[(IntPG, IntPG)]) -> bool {
+        let (domain, values): (Vec<IntPG>, Vec<IntPG>) = points.iter().cloned().unzip();
         let polynomial = Polynomial::interpolate(&domain, &values);
 
         polynomial.degree() <= Degree::Poly(1)
     }
-
 }
 
 // A few quick tests
@@ -274,147 +305,160 @@ impl Polynomial {
 mod tests {
     use super::*;
 
-    use crypto_bigint::I512;
+    use crypto_bigint::U512;
 
     #[test]
-    fn test_neg () {
+    fn test_neg() {
         let v = IntPG::from(42);
-        assert_eq!(- Polynomial { coefficients: vec![v; 10]}, Polynomial { coefficients: vec![-v; 10]})
+        assert_eq!(
+            -Polynomial {
+                coefficients: vec![v; 10]
+            },
+            Polynomial {
+                coefficients: vec![-v; 10]
+            }
+        )
     }
 
     #[test]
-    fn test_add () {
+    fn test_add() {
         let c1 = IntPG::from(42);
         let c2 = IntPG::from(7);
         let csum1 = IntPG::from(49);
         let csum2 = IntPG::from(42);
 
-        let p1 = Polynomial { coefficients: vec![c1; 10]};
-        let p2 = Polynomial { coefficients: vec![c2; 4]};
+        let p1 = Polynomial {
+            coefficients: vec![c1; 10],
+        };
+        let p2 = Polynomial {
+            coefficients: vec![c2; 4],
+        };
 
-        let csum_vec = vec![csum1, csum1, csum1, csum1, csum2, csum2, csum2, csum2, csum2, csum2];
+        let csum_vec = vec![
+            csum1, csum1, csum1, csum1, csum2, csum2, csum2, csum2, csum2, csum2,
+        ];
 
-        let psum = Polynomial { coefficients: csum_vec};
+        let psum = Polynomial {
+            coefficients: csum_vec,
+        };
         assert_eq!(p1 + p2, psum)
     }
 
     #[test]
-    fn test_mul_distr () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [0, 5, 5, 2].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
-        let b =
-            Polynomial {
-                coefficients:
-                    [2, 2, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+    fn test_mul_distr() {
+        let a = Polynomial {
+            coefficients: [0, 5, 5, 2].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
+        let b = Polynomial {
+            coefficients: [2, 2, 1].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
 
-        let c =
-            Polynomial {
-                coefficients:
-                    [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+        let c = Polynomial {
+            coefficients: [0, 5, 2, 5, 5, 1]
+                .iter()
+                .map(|x| (IntPG::from(*x)))
+                .collect(),
+        };
 
-        assert_eq!(a.clone() * (b.clone() + c.clone()), a.clone()*b.clone() + a.clone()*c.clone())
+        assert_eq!(
+            a.clone() * (b.clone() + c.clone()),
+            a.clone() * b.clone() + a.clone() * c.clone()
+        )
     }
     #[test]
-    fn test_mul_comm () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [0, 5, 5, 2].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
-        let b =
-            Polynomial {
-                coefficients:
-                    [2, 2, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+    fn test_mul_comm() {
+        let a = Polynomial {
+            coefficients: [0, 5, 5, 2].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
+        let b = Polynomial {
+            coefficients: [2, 2, 1].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
 
-
-        assert_eq!(a.clone() * b.clone(), b.clone()*a.clone())
+        assert_eq!(a.clone() * b.clone(), b.clone() * a.clone())
     }
 
     #[test]
-    fn test_div_exact () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
-        let b =
-            Polynomial {
-                coefficients:
-                    [2, 2, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+    fn test_div_exact() {
+        let a = Polynomial {
+            coefficients: [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
+        let b = Polynomial {
+            coefficients: [2, 2, 1].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
 
-        let DivOutput { quotient, remainder } = (a.clone() * b.clone())/b.clone();
+        let DivOutput {
+            quotient,
+            remainder,
+        } = (a.clone() * b.clone()) / b.clone();
         assert_eq!(quotient, a);
         assert!(remainder.is_zero());
     }
 
     #[test]
-    fn test_div_non_zero_rem () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
-        let b =
-            Polynomial {
-                coefficients:
-                    [2, 2, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+    fn test_div_non_zero_rem() {
+        let a = Polynomial {
+            coefficients: [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
+        let b = Polynomial {
+            coefficients: [2, 2, 1].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
 
-        let c =
-            Polynomial {
-                coefficients:
-                    [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+        let c = Polynomial {
+            coefficients: [0, 5, 2, 5, 5, 1]
+                .iter()
+                .map(|x| (IntPG::from(*x)))
+                .collect(),
+        };
 
-        let DivOutput { quotient: _, remainder } = (a.clone() * b.clone())/c.clone();
+        let DivOutput {
+            quotient: _,
+            remainder,
+        } = (a.clone() * b.clone()) / c.clone();
         assert!(!remainder.is_zero());
     }
 
     #[test]
-    fn test_div_ok () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
-        let b =
-            Polynomial {
-                coefficients:
-                    [2, 2, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+    fn test_div_ok() {
+        let a = Polynomial {
+            coefficients: [1, 0, 5, 2].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
+        let b = Polynomial {
+            coefficients: [2, 2, 1].iter().map(|x| (IntPG::from(*x))).collect(),
+        };
 
-        let c =
-            Polynomial {
-                coefficients:
-                    [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG::from(*x)) ).collect()
-            };
+        let c = Polynomial {
+            coefficients: [0, 5, 2, 5, 5, 1]
+                .iter()
+                .map(|x| (IntPG::from(*x)))
+                .collect(),
+        };
 
-        let DivOutput { quotient, remainder } = (a.clone() * b.clone())/c.clone();
-        assert_eq!(quotient * c + remainder, a*b);
+        let DivOutput {
+            quotient,
+            remainder,
+        } = (a.clone() * b.clone()) / c.clone();
+        assert_eq!(quotient * c + remainder, a * b);
     }
 
     #[test]
-    fn test_exp () {
-        let a =
-            Polynomial {
-                coefficients:
-                    [0, 5, 2, 5, 5, 1].iter().map(|x| (IntPG::from(*x)) ).collect() // x+1
-            };
+    fn test_exp() {
+        let a = Polynomial {
+            coefficients: [0, 5, 2, 5, 5, 1]
+                .iter()
+                .map(|x| (IntPG::from(*x)))
+                .collect(), // x+1
+        };
 
-        assert_eq!(a.clone() ^ IntPG::constant(&I512::from(7)), a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone());
+        assert_eq!(
+            a.clone() ^ IntPG::from(7),
+            a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone() * a.clone()
+        );
     }
 
     #[test]
-    fn test_interpolate () {
-        let domain : Vec<_> = [1, 9, 10].iter().map(|x| IntPG::from(*x) ).collect();
-        let values : Vec<_> = [15, 295, 357].iter().map(|x| IntPG::from(*x) ).collect();
+    fn test_interpolate() {
+        let values: Vec<_> = [5, 2, 2, 1, 5, 0].iter().map(|x| IntPG::from(*x)).collect();
+        let domain: Vec<_> = [1, 2, 3, 4, 5, 6].iter().map(|x| IntPG::from(*x)).collect();
         let res = Polynomial::interpolate(&domain, &values);
         let pairs = domain.iter().zip(&values);
 
@@ -428,277 +472,21 @@ mod tests {
     }
 
     #[test]
-    fn test_interpolate_hard () {
-        let last_domain : Vec<IntPG> = [
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070439E84C7B60601F37CB45B1F98D373",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008C0327E1D90D294ED1065674335548E9",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006537F6002965C04AD9720C633ED43306",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064C67A557940A1A6BF5F894F3B5B4AF4",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000353DE29A4355F19E04CF5123C725FA96",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007521C1AC86D518DDB1CED63327E6E26F",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000041AACE04DF298E5326D747B1FD323831",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B69D608842A9C482670F9348AB85682C",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000053871AD25A37F98CF62C2BB5D9DE59BE",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000066431BD9C37C606B66E4B2C6867CE364",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062484819D8D40988B71C61463B7F56DB",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B1F73FC5B19B51790BE7DA5CBBBAC9EF",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AD93EA8B344D1B959019336AC6669CBB",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BEDE4A6DB8480FEB945B7361FA943F46",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A79806FA39C8A0F289D3C8CA4CA087D3",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005ACA4A7AD10D50D1BF02A47AF11947D8",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000067E7C4153E4A0448A84E96F82BD7B802",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006A8F5CD13926CAA7D83BC1CF71B118B7",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B3D0F49C11B4F668498B564CACC0DE74",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005F933836C6C3A80329E6E6C1E4825C50",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A71775AE2060D2103E3076D883E5FA63",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001F4B2F5E03625311C5D903FBA350720E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000165B788C50C9EAB8DF4A63F7C3FC5E0D",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A6BC4468FCDB0E495E3F400D5A35E250",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004D57BC8718E97E61510F9B50297A49E1",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000055E465500B037A1688A9985415CD9694",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000085979EC86EB01AF0C6BCCD6857E8E2B3",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005A5165A3D4F4CF22688631C142EBF325",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003BD8590C85304B7221F88650FB2F6B31",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001373524392CDDA0344138AC2EB329F7F",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008106AA0F04FBECD620BC14FC0228BF79",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009962E0F7F6271EE75D066123CB55B81E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000CA95395D499D49E15894199AB75450E7",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008CF6600C61D156A67928E61140167042",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003E065BAF1EBF429B5CA2D51C5BF5F159",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BC01C5E54E6A3A946B980EEFDC72B0F3",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005C214A72C72D4345C1E222A83D8F63E7",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C295416158C3D9B7EA87F218FDCE8DC",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008CAA7F5D2CFD14CE74D9E143CE071008",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006F5330A2A6E3B190B59C2CC6AD8E7E87",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000947E400161783F446A9269F2E30B7917",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000019521787A380CBFFDE8B4D0863947021",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004D23F276663295F1FBF2D0284336C05E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B36EA5C1617832043262C31EF5EA8D7A",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D281E94BC6C6301699217E0E61C729B",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004F4335C6950316EA1E60E991B360668A",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009F05040088774FBF05DD03331717DD44",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B7CFEA101FAFB267D6825A5243E43118",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009DD98EDA3B9349D906EACA386BCF97DE",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002102D2A28153DCBC561C84A1F0EBEC4D",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007AA813BCEE1268F229D4DBA1877A8C0A",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AB148B445BDECE00B2E4F1D759CAA52C",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022287BC3327E9772524FFA3E6DA4828E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A7B633007639D0D949C0D8BD3112DA57",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008333C396673A7D4181522088699EB2ED",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002A1733CECCE9C01EC2CF1836AF45A3B1",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000798FFE326C9DBD0B87EFD06D2ABA35F9",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ACB1BDE87D512D64915DCBA3E53BC3D3",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000156C9AC01A299275B3B8C744BE13FD0C",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008E40F4B6B69E11622238C8DC66DD37F5",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BCCD28E5C1959062C4F32D6914022E76",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C69CD7B4184C2E71E891B21903B2D41",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000724F79E09CE7221CC1B5BE44F70727CA",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BDDC06FA79E4EDCF50A5A522A651C4D9",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005B3C617B3849F9FE0C834BA4E0672C8E",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003F7CD81E26F2D6B12EF9A98BCCAAB718",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000664809FFD69A3FB5268DF39CC12BCCFB",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000066B985AA86BF5E5940A076B0C4A4B50D",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000096421D65BCAA0E61FB30AEDC38DA056B",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000565E3E53792AE7224E3129CCD8191D92",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000089D531FB20D671ACD928B84E02CDC7D0",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014E29F77BD563B7D98F06CB7547A97D5",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000077F8E52DA5C8067309D3D44A2621A643",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000653CE4263C839F94991B4D3979831C9D",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006937B7E6272BF67748E39EB9C480A926",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001988C03A4E64AE86F41825A344453612",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001DEC1574CBB2E46A6FE6CC9539996346",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000CA1B59247B7F0146BA48C9E056BC0BB",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000023E7F905C6375F0D762C3735B35F782E",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070B5B5852EF2AF2E40FD5B850EE6B829",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000063983BEAC1B5FBB757B16907D42847FF",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060F0A32EC6D9355827C43E308E4EE74A",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017AF0B63EE4B0997B674A9B3533F218D",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006BECC7C9393C57FCD619193E1B7DA3B1",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024688A51DF9F2DEFC1CF89277C1A059E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AC34D0A1FC9DACEE3A26FC045CAF8DF3",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B5248773AF36154720B59C083C03A1F4",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024C3BB970324F1B6A1C0BFF2A5CA1DB1",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007E284378E716819EAEF064AFD685B620",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759B9AAFF4FC85E9775667ABEA32696D",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000045E86137914FE50F39433297A8171D4E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000712E9A5C2B0B30DD9779CE3EBD140CDC",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008FA7A6F37ACFB48DDE0779AF04D094D0",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B80CADBC6D3225FCBBEC753D14CD6082",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004A7955F0FB041329DF43EB03FDD74088",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000321D1F0809D8E118A2F99EDC34AA47E3",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000EAC6A2B662B61EA76BE66548ABAF1A",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003E899FF39E2EA95986D719EEBFE98FBF",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008D79A450E140BD64A35D2AE3A40A0EA8",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F7E3A1AB195C56B9467F110238D4F0E",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006F5EB58D38D2BCBA3E1DDD57C2709C1A",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AF56ABE9EA73C264815780DE70231725",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003ED580A2D302EB318B261EBC31F8EFF9",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005C2CCF5D591C4E6F4A63D3395271817A",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003701BFFE9E87C0BB956D960D1CF486EA",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B22DE8785C7F34002174B2F79C6B8FE0",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007E5C0D8999CD6A0E040D2FD7BCC93FA3",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018115A3E9E87CDFBCD9D3CE10A157287",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BE57E16B43939CFE966DE81F19E38D66",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007C3CCA396AFCE915E19F166E4C9F9977",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002C7AFBFF7788B040FA22FCCCE8E822BD",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013B015EFE0504D98297DA5ADBC1BCEE9",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002DA67125C46CB626F91535C794306823",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AA7D2D5D7EAC2343A9E37B5E0F1413B4",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000050D7EC4311ED970DD62B245E788573F7",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000206B74BBA42131FF4D1B0E28A6355AD5",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A957843CCD81688DADB005C1925B7D73",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000023C9CCFF89C62F26B63F2742CEED25AA",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000484C3C6998C582BE7EADDF7796614D14",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A168CC3133163FE13D30E7C950BA5C50",
-            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000051F001CD936242F478102F92D545CA08",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ECE421782AED29B6EA2345C1AC43C2E",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B613653FE5D66D8A4C4738BB41EC02F5",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003D3F0B494961EE9DDDC737239922C80C",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000EB2D71A3E6A6F9D3B0CD296EBFDD18B",
-            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AF163284BE7B3D18E176E4DE6FC4D2C0",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005930861F6318DDE33E4A41BB08F8D837",
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000DA3F905861B1230AF5A5ADD59AE3B28"
-        ].iter().map(|x| IntPG::constant(&I512::from_be_hex(x))).collect();
+    fn test_interpolate_hard() {
+        let last_domain : Vec<IntPG> = ["00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070439E84C7B60601F37CB45B1F98D373", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008C0327E1D90D294ED1065674335548E9", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006537F6002965C04AD9720C633ED43306", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000064C67A557940A1A6BF5F894F3B5B4AF4"] // "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000353DE29A4355F19E04CF5123C725FA96", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007521C1AC86D518DDB1CED63327E6E26F", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000041AACE04DF298E5326D747B1FD323831", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B69D608842A9C482670F9348AB85682C", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000053871AD25A37F98CF62C2BB5D9DE59BE", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000066431BD9C37C606B66E4B2C6867CE364", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062484819D8D40988B71C61463B7F56DB", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B1F73FC5B19B51790BE7DA5CBBBAC9EF", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AD93EA8B344D1B959019336AC6669CBB", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BEDE4A6DB8480FEB945B7361FA943F46", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A79806FA39C8A0F289D3C8CA4CA087D3", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005ACA4A7AD10D50D1BF02A47AF11947D8", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000067E7C4153E4A0448A84E96F82BD7B802", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006A8F5CD13926CAA7D83BC1CF71B118B7", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B3D0F49C11B4F668498B564CACC0DE74", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005F933836C6C3A80329E6E6C1E4825C50", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A71775AE2060D2103E3076D883E5FA63", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001F4B2F5E03625311C5D903FBA350720E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000165B788C50C9EAB8DF4A63F7C3FC5E0D", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A6BC4468FCDB0E495E3F400D5A35E250", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004D57BC8718E97E61510F9B50297A49E1", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000055E465500B037A1688A9985415CD9694", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000085979EC86EB01AF0C6BCCD6857E8E2B3", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005A5165A3D4F4CF22688631C142EBF325", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003BD8590C85304B7221F88650FB2F6B31", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001373524392CDDA0344138AC2EB329F7F", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008106AA0F04FBECD620BC14FC0228BF79", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009962E0F7F6271EE75D066123CB55B81E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000CA95395D499D49E15894199AB75450E7", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008CF6600C61D156A67928E61140167042", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003E065BAF1EBF429B5CA2D51C5BF5F159", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BC01C5E54E6A3A946B980EEFDC72B0F3", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005C214A72C72D4345C1E222A83D8F63E7", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C295416158C3D9B7EA87F218FDCE8DC", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008CAA7F5D2CFD14CE74D9E143CE071008", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006F5330A2A6E3B190B59C2CC6AD8E7E87", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000947E400161783F446A9269F2E30B7917", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000019521787A380CBFFDE8B4D0863947021", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004D23F276663295F1FBF2D0284336C05E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B36EA5C1617832043262C31EF5EA8D7A", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D281E94BC6C6301699217E0E61C729B", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004F4335C6950316EA1E60E991B360668A", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009F05040088774FBF05DD03331717DD44", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B7CFEA101FAFB267D6825A5243E43118", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009DD98EDA3B9349D906EACA386BCF97DE", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002102D2A28153DCBC561C84A1F0EBEC4D", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007AA813BCEE1268F229D4DBA1877A8C0A", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AB148B445BDECE00B2E4F1D759CAA52C", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022287BC3327E9772524FFA3E6DA4828E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A7B633007639D0D949C0D8BD3112DA57", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008333C396673A7D4181522088699EB2ED", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002A1733CECCE9C01EC2CF1836AF45A3B1", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000798FFE326C9DBD0B87EFD06D2ABA35F9", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ACB1BDE87D512D64915DCBA3E53BC3D3", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000156C9AC01A299275B3B8C744BE13FD0C", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008E40F4B6B69E11622238C8DC66DD37F5", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BCCD28E5C1959062C4F32D6914022E76", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C69CD7B4184C2E71E891B21903B2D41", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000724F79E09CE7221CC1B5BE44F70727CA", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BDDC06FA79E4EDCF50A5A522A651C4D9", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005B3C617B3849F9FE0C834BA4E0672C8E", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003F7CD81E26F2D6B12EF9A98BCCAAB718", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000664809FFD69A3FB5268DF39CC12BCCFB", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000066B985AA86BF5E5940A076B0C4A4B50D", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000096421D65BCAA0E61FB30AEDC38DA056B", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000565E3E53792AE7224E3129CCD8191D92", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000089D531FB20D671ACD928B84E02CDC7D0", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014E29F77BD563B7D98F06CB7547A97D5", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000077F8E52DA5C8067309D3D44A2621A643", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000653CE4263C839F94991B4D3979831C9D", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006937B7E6272BF67748E39EB9C480A926", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001988C03A4E64AE86F41825A344453612", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001DEC1574CBB2E46A6FE6CC9539996346", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000CA1B59247B7F0146BA48C9E056BC0BB", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000023E7F905C6375F0D762C3735B35F782E", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070B5B5852EF2AF2E40FD5B850EE6B829", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000063983BEAC1B5FBB757B16907D42847FF", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060F0A32EC6D9355827C43E308E4EE74A", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017AF0B63EE4B0997B674A9B3533F218D", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006BECC7C9393C57FCD619193E1B7DA3B1", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024688A51DF9F2DEFC1CF89277C1A059E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AC34D0A1FC9DACEE3A26FC045CAF8DF3", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B5248773AF36154720B59C083C03A1F4", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024C3BB970324F1B6A1C0BFF2A5CA1DB1", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007E284378E716819EAEF064AFD685B620", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759B9AAFF4FC85E9775667ABEA32696D", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000045E86137914FE50F39433297A8171D4E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000712E9A5C2B0B30DD9779CE3EBD140CDC", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008FA7A6F37ACFB48DDE0779AF04D094D0", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B80CADBC6D3225FCBBEC753D14CD6082", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004A7955F0FB041329DF43EB03FDD74088", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000321D1F0809D8E118A2F99EDC34AA47E3", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000EAC6A2B662B61EA76BE66548ABAF1A", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003E899FF39E2EA95986D719EEBFE98FBF", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008D79A450E140BD64A35D2AE3A40A0EA8", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F7E3A1AB195C56B9467F110238D4F0E", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006F5EB58D38D2BCBA3E1DDD57C2709C1A", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AF56ABE9EA73C264815780DE70231725", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003ED580A2D302EB318B261EBC31F8EFF9", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005C2CCF5D591C4E6F4A63D3395271817A", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003701BFFE9E87C0BB956D960D1CF486EA", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B22DE8785C7F34002174B2F79C6B8FE0", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007E5C0D8999CD6A0E040D2FD7BCC93FA3", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018115A3E9E87CDFBCD9D3CE10A157287", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BE57E16B43939CFE966DE81F19E38D66", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007C3CCA396AFCE915E19F166E4C9F9977", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002C7AFBFF7788B040FA22FCCCE8E822BD", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013B015EFE0504D98297DA5ADBC1BCEE9", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002DA67125C46CB626F91535C794306823", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AA7D2D5D7EAC2343A9E37B5E0F1413B4", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000050D7EC4311ED970DD62B245E788573F7", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000206B74BBA42131FF4D1B0E28A6355AD5", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A957843CCD81688DADB005C1925B7D73", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000023C9CCFF89C62F26B63F2742CEED25AA", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000484C3C6998C582BE7EADDF7796614D14", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A168CC3133163FE13D30E7C950BA5C50", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000051F001CD936242F478102F92D545CA08", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ECE421782AED29B6EA2345C1AC43C2E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B613653FE5D66D8A4C4738BB41EC02F5", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003D3F0B494961EE9DDDC737239922C80C", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000EB2D71A3E6A6F9D3B0CD296EBFDD18B", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AF163284BE7B3D18E176E4DE6FC4D2C0", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005930861F6318DDE33E4A41BB08F8D837", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000DA3F905861B1230AF5A5ADD59AE3B28"]
+        .iter().map(|x| IntPG::constant(&U512::from_be_hex(x))).collect();
 
-        let last_cw : Vec<IntPG> = [
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009C99AB641B2180FB15E996191903FCFF",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007869463FB1B829D28BCA5834938BC260",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C0D63F115A997BF942032A7DD1F769CC",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5E36860039464B14C8C67EF5DE878AD",
-       "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF642BC7A25698304935F8373763D8E008",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF4F00934A3B0BC71C5EC193D4A7D10C5",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004FA27F6B8ECF779723F85E9723E610D2",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BE43F1BABE53B54F38EB9417021E9CE1",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008303D6167AD871B69294061A822F1FB",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000026265E06C03605CE9EFAA2A9E65EB79F",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000023BBD5124883D98CDE0DEE6FC7C74CA6",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008920FC577B2F70ED4A4074AD5418B0B0",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009A314FBEF771FE73350AEED91BB61B80",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B76BEDC28BFE0DBC06AB8FA9C8D5A9F8",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000BE7A3FA9F4CCFD0B83162D52CF11339C",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009D87288AE402A1642516CDB46DFC5357",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFED733A4274939C77C11903582C08FBCF",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A892387AF2DFF26B32AEE2992FA7A49C",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009201F628A0C0ED939CF646FE638DEDB0",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007F00D19B56D357BAE192B946C3BEC869",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000480FF95FD23270AAE00F5727D91844D",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001AFAAE56184D67E549C3F03CB347CE3B",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000226274CFA09D68B4B0136F50AFE54747",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000455597025226C92A533C6FAC1B05AE30",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009FAF300D025480E4FB787E8B8D435328",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AFD0F752F4171250FF4E55E3CD983C39",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000063A672E4F09D81B691A20C4D7068AE48",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF8361D3FED200E4530DC4824AB3DC58B4",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A1550FCE7BFDCE2AB68752F87E0F882",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000843C79C82F2AFA9543D17830BF8BA590",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBEB33994A204C2DF3314B96BFBFC8D48",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000091F459DEF4B0DA90DD7CDCA013BF152E",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004B6AEB24CF144572CB4C3504CCAA0CB2",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C86D547D6819ADB58D4B85427B91B1AA",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF84DEB6A04292573C2EC5C9E5DBFFBA71",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016B1587AE21834C1DF16AB40D5F224F2",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000918359FA2C65589A8ED89B2E794F439B",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001F57D5243780E73B087897CD4137C89C",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009575BD61F49FBD0BCB00ACF991FCB7CF",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB1F8437EAC95299D87025EFC20762FF9",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000071F602D1973075D057D5E54FF969CE22",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027F2298143229D9805D4CA139D6F0609",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBB525BB610F308ECBD6ED6F8318FE26",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000032A64A569FAAC8EE200E8EEB748F7E15",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A1135F3C8D10235A4CF69170F92DA839",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022047EA33AB37555E3C66525EDB004C7",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B2051D0E1A48CCBD2DE97AC6976F207E",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C2FF589F4A3B11B85704CE76FB2EF0E7",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B9BC94294B8F9827921FFED0124A29A",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016755969BA4A838098389763CD9CB403",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000033E89647AE462128D088A18253486402",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000E635719E4DABAE11197B32DFB66636B",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF445154EEB116E4998CBB58606F9F355E",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000071635D60BAA50A08380FE8DE73A7C1B2",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9FB439E114D933D0C9E8F23C2BC2722A",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AC81C928301337713D6E5B5A300BBB33",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016C82E263CD4361C3598A04FBE80BA8B",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000099281E80775B1EE71449FBE1DD865745",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009F010D417F023F6345EF49188A0F68C1",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000636C000B6765010D92A63630FC34707B",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008C9B229458B0A02B2471D128202BC41",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000090D5A9509C341A61A6555D57F6C57CC7",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004C3F5742F15A395D6465B25E7A7906CB",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C227964CCC2DCC45CB7390D83598DF2F",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF4BF32A4DF26F3F82750B34F3737E017",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009EFC21AFF1ED579E745A0D635455C632",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002F6325E0B0086E66987C34AB3696D8A4",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000045363C26E18B76FA7A044AE5293FC7F",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AC34B32078C2DDED9C5A498BEC6D03EE",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF59972A0416B4DEA71DAD79CF279E13B",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5E69EA2508B1EB4D0640B653A352E46C",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007C424DDF2DF0517FEFE7280F890BB5C7",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009E3637238179B1D41908C64EAFEF05A4",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000088D14E0DAD230056A4A8A18A72DC3D0F",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000058A5AF311B13112A9565BEC30DCAA6E2",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF78D059C8A97EA8A4DD93B2DDCEC15E4",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A52D105B0D370356C1E60E3DFED08AD0",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000688570F904BA2131C0082EB7798B698",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002A11E486103957475F31BB68C322AD35",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005229E13A443B8846F7332AF43A0D2167",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDDE29C072994EE6DD57F66B16D4B1D94",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006F570A0AE995155F7DD7D04043FBC6F3",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B50A515C89A9866FE46DC7BDA820117F",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C344C3FC9E19579DF78A5999878E29F",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013EB060D313DC49601AAD52D754217F6",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C2D3F0217A2264796B70BB4CDCF27B3",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001606CD0DEB62062ACC968602A31ECB76",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000097E02AFF90E05F8263B84342B952844C",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF77886278271D721FF6CB814E7505F20C",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000954625A875CBC2F4345ED6FED2778AE6",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007C3BD4867AAAB96F6039FD4E72D46E93",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE565BD7F26643B6D8FD7B38480804A51",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000237B0B4F91E88F55BFC8CB6FF5207C94",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000015346E30EBB3AF2FCFDC621C7352FD9F",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000032F806CC51ED55219FBEF3910B5B1F7",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000042B681A31B01BB7D9A572F8A5D373E0E",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000069937A24EF39A27D83553199A1C5B37D",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDED98ED1B84B8643D4C6ACD58EE1A3E6",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C2DE1C2C36A889C437170BF659FBBE46",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AFDCBCDCBF6064EC6F8A19019598EBA8",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AAE9144CD68E0B0DA338F16EE68EC7AD",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B6CF5BE954612693618A7E1DFFB70C7F",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001716656AC78379F7D4FF0BC2B08E6D00",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A7AA713C30B4DCA2A93218E9037A2F0C",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000154F353CBBF9670B5328E812E12C6D07",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000071010864DAC3661E160CC019C3675DAE",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009A2EC0C683A6EC5AABB28A261FC47AFD",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000817E508153D19E2E4BFC41173D47D5F8",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE4FD65B3C12AC0E5A0A0712BF0DE3BE1",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001294CAD6F9758C87AD4CDF822B5BF8D6",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076E3EA48FFC0A8EC93F6EF1DF5D61029",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF978A883825FF5223419E7CB9F6E198E1",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000C78B2B0749BA4B788D8863464266C460",
-        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017C5B2A5D89ABDF8E7F7C7655F612E2",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003E84ED01B1AA4D04458D2C2B6236DCF8",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004CBE208B803DB0AC58DD163B177687FB",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ACD158AC6DBE97D199677C552B9A4AF",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001BA0A36D8EE5CED8CC3753EB8BAC8C5",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004C41CA18638CDED3E3F415CFDE40120C",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000069D6F7C382D3D44CE0B37F6311026616",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE14E27E856A060D4E578263CC64CCE33",
-        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004DE51DF3B9582142BFCC713EFFFAFC9B",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDC3C9941065E062478BAD8993D0C283D",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF86101C5C2684512D757B36FD6B2EEDEC",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB9D29DA767B5B7A718A92F670A96E025",
-        "0000000000000000000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBAE0323006A97D0783169631591CD638",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010DC631B0A141F311AF7728198DA017D",
-        "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022CA3801347E97919A2CEE17B9E5B130"
-       ].iter().map(|x| IntPG::constant(&I512::from_be_hex(x))).collect();
+        let last_cw : Vec<IntPG> = ["FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF97B85FC3FACBAD7084CAF39293D273AF" , "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6CF95C0B6B459F6D2C06D815CD9E8EB0", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE0F84E5B959C267E1169EABE8C658CC1", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007655E0F19802F30E2915BBD5F9018C3D"]
+        //, "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AB4243A6A40652D12F96B4F039980EA2", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000097CAE0D9B0E7BD24E3DFA2401B50F896", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000754956035DA83A2B9343CD1D0DDFAAE0", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006597CC93CC842CBC7B11D1F344BA1159", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000655345DC29312AF1CDADB62D0B653033", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000728A57BF2F81620434DA6F0BE3D015BD", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF9118236CC6248D792673A33E30C705E7", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005A0B2C37DA2319348F5A035CC44DBF7", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB651E972D46B7795F1F7C4FCA59E9B53", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDE71D118600733F987A33A8E98422217", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE2D0C0B5D88B7347E038572BAC6D3C43", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEB226530EE07C5C437D70C3965F0B8A7", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000035991B99274C172E5183F554B69A3F79", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A5E01285E172C968F32D52344BD8BA44", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003719C372E2FC627D5473E60E632DED0", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000AEEF2DB47BE0DEEF608A8CCC9EA66692", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000046F29183B9724E4C35E47C6E5B63792F", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000356CFCF5864B6846C4BAAFB71D15D87E", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000061BB6F2C5353EF72BD1D789CD951C2FF", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007FDE43D525739EC949A44E33ECEFF85B", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000351B9921095B1C3ECF210960A80D9AA5", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC59BAB6AD1C5C1D0B74EF8CD6B35C7BE", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF81292EB5CD47307FE71748CCA0605217", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000081CB00D74A638644695728BEE77A6BB3", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF72DAA8CB6A797DC3EE3257C08274BB37", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A78155CD800FE196689B6B5FD62D907E", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000265B7191A11D13FCA50FB0628B3D234C", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD4D0A51EA3B9ED12E4B8DAA436F297B1", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000075BA711621B9AEB82CBDF83CE3F69F6C", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC074EA66D0A312BB907ED18B8DC57FEF", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007D9F84582B0D54142BDAB5513172E8D6", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009F3CF2E39D5757DF073E22DDAD5F0575", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF84CC1173F4F43F70A1336FF26F507FF2", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006C36D9A436A9CA0DD3196F225E256F62", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005561FFD26A6BA6C1EA4F1DE3E0B8102E", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009C198DB74A3C9D601EA4D7707502BC7A", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001006AC4381566399E75DAEE3F3F0C09E", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002F4D9A47497AA2755CE50779ADFCFB37", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005081E2055D732F636483579979CA2EE0", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF593053CC8C5C55E94216067CDCAD549C", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020B1B3007718CC415EDC6F6D4A44D0B6", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009870E20E6C65F029A5F45150951EB590", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002594142D3AAFF70EAF31762D631CA512", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006CF39E8B1B7F553F5E42285C87784756", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000F70B370A42BFEE6EFBB55A1C56FD965", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000351A77342505A0D37953D2063A378555", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEA806E77C24A3FA410BA6E39CA78FE89", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005900D348E3537F39E487658BB4E7E26C", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011673134820884414B6903022C463ECD", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000833835BB9184F2770967E3FB34F6F1C8", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000369108BE6BC5D49FB8A84A4E26DD5354", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF71C288C71D9AE6DD19A7003111E69C1D", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF3ED88AD9AEC41BE22591C4A74F38A04", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000382884E2B52AF11F4C03F3F5A69CA697", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008366BC105094FF02B77929C1F49B4616", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF45E507BC39E4D247789220228C24D1D", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A5E831F211F742168BEE995CF9908700", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000936637DE69618C27A518002679CD0DAF", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A6C5209845B18A4E0AD5E1AD73D67FA8", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF16E05604AAB16B463CCE9F2174CA53C", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062A63D01E029A2947BD9A8636B616C62", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009419FCFB609451620707B5E56F730835", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006FE8B800B2720866A511841F1B1966BB", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005EAFDD575F3CFD61558C2B0D457E2F15", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF53E44811AE5C03126BC4B769DD3251C3", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002DA20CD842EDAC9DCD10BCFF4DD6D785", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000072FB982846EC03BB3EA21517F816A73A", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF89636C943E55B45D56CF6C12A5853FA6", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005DEF1562567036AD55A347C61CF4EBF", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006E913C347C2F85443963FDB2BCE39CE8", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB1F9449DEEC3DD39243BF33FC6760831", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000822BBAFF85DCD8EA45DB21D6DDCF77C1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE86548CF3E4AC0E7AC4A4DC4AA7C99F6", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007F57155C7410EE073318240946B176FC", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE51261C2D1A5C479CB55198A7E587C6C", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5757044EDDAB3DC7F53C29DC886CD015", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B5DBC6931C27464207F7FB251152FF5F", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008BA5197B6D2D993C0D536763CA7D57C7", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014DC36557667E68BA1FD08F3BB4EAA92", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000227894817D20FE70374D5AC5CC92E821", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000A49AC703493A78E798D6E1598C7E080E", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000042E5AEBD8373E33CFCAB7A7913F0F006", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B829624C376E88855549D1F6414A8D35", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007A4C53E2C3187728E8EB4E4C68F5B997", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B545CDC03EFCE18F1055A1E2E2D21826", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001A3ACC5C92D0B28543BCE129B69FCF1D", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001863D2D1E4A18F0F5E65AFAD0F915B75", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000209B2E835C0E7C189D5143A06A9CCD65", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007500688FCB5F05B8567FE0D4677258D1", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009F0D370D3ED810CAA4473B590E613409", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000B92DAD7E574331960DAD66EE40179FEA", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000041760906C7244BECF67B5D8D00F1B9F7", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF841208ED9E999670CAF55889F2CC3957", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000095D94D9A198D7C7C4B8C4AD9417ED176", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000794877DF867D915AA4CC7CF699289575", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000015FD7CBBC74B183A822C682EF3D83749", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000086F1D13855D9C7650980F906544E1D8C", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF853A8DD657DBEAEA607FFA4EC028C861", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000033B5FEF6F211B6FA1F28F69E018D4986", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000D5F32CB2C62B219FF34BCE44565D4AD", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009030E0E2B6F828EA289247662EB53E1F", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000FFA848FE9CD7C2A98D3FCFA456B72F0", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6F91A2E0073E9F12F5E2B5F967FFAC0B", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFD721892AF74FE2DCF28CE6043AB2F3AF", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007E59E88006E0F6DCC1CED4587B5F5F95", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBCEFF9E24B15AEDCFCCC0A03F818873E", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007C89684810A91F393790E704BF95CC02", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000088535381DB6B09165D6F6E45F9A2C327", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008FB35E6A99072DFAA62F5B722028994B", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC923B4C1FB1D949EE7EFECBD23F6913", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC439128E79E3B954256CBB11360E3ACA", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020273DA203CE1850C58D5C396AD0A2D4", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF77FA9090EBE7CD9305BB8BCA31243D6F", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016229156D167F259403C98B230B71E50", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000044C04E37628D2FA9404640E4A0A6FAE4", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF85E51C82908290DDE21D3B5DCF6E7299", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005FF9342797221A372A059A99CB5DA891", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003D953DBE57E4BE9F2B9A40F112F54A5", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000085BCDE538D3824F21D79C59952F1545B", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002C0E0E94EF94844F3C8899E0E4F73E9D", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001A0A365D1C4CF257C81C9BD69D2ACA22", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000043E001135556BABB6FED6F4A0F0C6F57", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004DD1F0020E6450F1597C268E58F6772F", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000048DDA31072B7010C762ACC3F6E2439C1"]
+        .iter().map(|x| IntPG::constant(&U512::from_be_hex(x))).collect();
 
         // let domain : Vec<_> = [1, 9, 10].iter().map(|x| IntPG::constant(*x) ).collect();
         //let values : Vec<_> = [15, 295, 357].iter().map(|x| IntPG::constant(*x) ).collect();
         let res = Polynomial::interpolate(&last_domain, &last_cw);
         let pairs = last_domain.iter().zip(&last_cw);
 
-        for (i, (&x, &y)) in pairs.clone().enumerate() {
-            let new_y = res.evaluate(&x);
-            assert_eq!(new_y, y, "#{}: evaluate ({:?}) = {:?} <> {:?}", i, x, new_y, y);
+        for i in 0..last_domain.len() {
+            assert_eq!(res.evaluate(&last_domain[i]), last_cw[i]);
         }
 
         assert_eq!(res.evaluate_domain(&last_domain), last_cw);
@@ -707,8 +495,11 @@ mod tests {
     }
 
     #[test]
-    fn test_zerofier () {
-        let domain = [0, 5, 2, 5, 5, 1].iter().map(|x: &i32| IntPG::from(*x) ).collect();
+    fn test_zerofier() {
+        let domain = [0, 5, 2, 5, 5, 1]
+            .iter()
+            .map(|x: &i32| IntPG::from(*x))
+            .collect();
 
         let res = Polynomial::zerofier(&domain);
 
