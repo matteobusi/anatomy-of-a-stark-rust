@@ -12,6 +12,10 @@ I included the source code of the [crypto-bigint](https://github.com/RustCrypto/
 # 🚧 This is a work in progress 🚧
 This code is *not* ready for production. I'm aiming for clarity and correctness, but the implementation probably contains bugs :)
 
+## TODOs
+1. Property-based testing
+2.
+
 # License
 
 I am including the [crypto-bigint](https://github.com/RustCrypto/crypto-bigint/) code, for their license please refer to the relevant files in their folder.
