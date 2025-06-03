@@ -501,8 +501,11 @@ mod tests {
 
         let verdict = fri.verify(&mut ps, &mut points);
 
-        if let Ok(()) = verdict {
-            panic!("Proof accepted but it should NOT be valid!")
+        let expected_err = "Last codeword does not correspond to a low enough degree polynomial!";
+        match verdict {
+            Ok(()) => panic!("Proof accepted but it should NOT be valid!"),
+            Err(found_err) if !found_err.starts_with(expected_err) => panic!("Proof rejected with wrong motivation: expected {} found {}", expected_err, found_err),
+            _ => () // This is ok :)
         }
     }
 }
